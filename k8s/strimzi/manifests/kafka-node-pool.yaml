@@ -3,6 +3,7 @@ kind: KafkaNodePool
 metadata:
   name: kraft
   labels:
+    strimzi.io/cluster: my-cluster
     app.kubernetes.io/part-of: event-platform
 spec:
   replicas: 1
