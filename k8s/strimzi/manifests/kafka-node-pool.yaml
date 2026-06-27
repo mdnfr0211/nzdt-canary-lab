@@ -3,7 +3,7 @@ kind: KafkaNodePool
 metadata:
   name: kraft
   labels:
-    strimzi.io/cluster: my-cluster
+    app.kubernetes.io/part-of: event-platform
 spec:
   clusterRef:
     name: my-cluster
@@ -13,3 +13,10 @@ spec:
     - broker
   storage:
     type: ephemeral
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
