@@ -1,7 +1,7 @@
 # event-gateway — distroless static image
 FROM golang:1.23 AS build
 WORKDIR /src
-COPY main.go go.mod ./
+COPY main.go go.mod go.sum ./
 RUN go mod download && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gateway ./
 
