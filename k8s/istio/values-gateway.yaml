@@ -4,11 +4,11 @@ service:
     - name: http2
       port: 80
       targetPort: 8080
-      protocol: HTTP
+      protocol: TCP
     - name: https
       port: 443
       targetPort: 8443
-      protocol: HTTPS
+      protocol: TCP
 
 autoscaling:
   enabled: false
