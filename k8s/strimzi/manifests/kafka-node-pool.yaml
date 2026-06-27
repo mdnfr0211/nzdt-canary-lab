@@ -1,0 +1,15 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: kraft
+  labels:
+    strimzi.io/cluster: my-cluster
+spec:
+  clusterRef:
+    name: my-cluster
+  replicas: 1
+  roles:
+    - controller
+    - broker
+  storage:
+    type: ephemeral
