@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-metrics-config
+  namespace: kafka
+  labels:
+    app.kubernetes.io/part-of: event-platform
+data:
+  kafka-metrics-config.yml: |
+    # LowercaseOutputName and LowercaseOutputLabelKeys from Strimzi JMX exporter examples
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    rules:
+      # Special cases and very specific things
+      - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), topic=(.+), partition=(.*)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          clientId: "$3"
+          topic: "$4"
+          partition: "$5"
+      - pattern: kafka.server<type=(.+), name=(.+), clientId=(.+), brokerHost=(.+), brokerPort=(.+)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          clientId: "$3"
+          broker: "$4:$5"
+      - pattern: kafka.server<type=(.+), cipher=(.+), protocol=(.+), listener=(.+), networkProcessor=(.+)><>connections
+        name: kafka_server_$1_connections_tls_info
+        type: GAUGE
+        labels:
+          cipher: "$2"
+          protocol: "$3"
+          listener: "$4"
+          networkProcessor: "$5"
+      - pattern: kafka.server<type=(.+), clientSoftwareName=(.+), clientSoftwareVersion=(.+), listener=(.+), networkProcessor=(.+)><>connections
+        name: kafka_server_$1_connections_software
+        type: GAUGE
+        labels:
+          clientSoftwareName: "$2"
+          clientSoftwareVersion: "$3"
+          listener: "$4"
+          networkProcessor: "$5"
+      - pattern: "kafka.server<type=(.+), listener=(.+), networkProcessor=(.+)><>(.+)"
+        name: kafka_server_$1_$4
+        type: GAUGE
+        labels:
+          listener: "$2"
+          networkProcessor: "$3"
+      - pattern: kafka.server<type=(.+)><>(.+):
+        name: kafka_server_$1_$2
+        type: GAUGE
+
+      # Request metrics
+      - pattern: kafka.network<type=(.+), name=(.+)><>Value
+        name: kafka_network_$1_$2
+        type: GAUGE
+      - pattern: kafka.network<type=(.+), name=(.+)PerSec, request=(.+)><>OneMinuteRate
+        name: kafka_network_$1_$2_per_sec
+        type: GAUGE
+        labels:
+          request: "$3"
+      - pattern: kafka.network<type=(.+), name=(.+)PerSec, request=(.+)><>Count
+        name: kafka_network_$1_$2_total
+        type: COUNTER
+        labels:
+          request: "$3"
+      - pattern: kafka.network<type=(.+), name=ResponsesPerSec, request=(.+)><>OneMinuteRate
+        name: kafka_network_$1_responses_per_sec
+        type: GAUGE
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=ResponsesPerSec, request=(.+)><>Count
+        name: kafka_network_$1_responses_total
+        type: COUNTER
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=RequestQueueTimeMs, request=(.+)><>Count
+        name: kafka_network_$1_request_queue_time_ms_total
+        type: COUNTER
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=LocalTimeMs, request=(.+)><>Count
+        name: kafka_network_$1_local_time_ms_total
+        type: COUNTER
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=RemoteTimeMs, request=(.+)><>Count
+        name: kafka_network_$1_remote_time_ms_total
+        type: COUNTER
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=RequestThrottleTimeMs, request=(.+)><>Count
+        name: kafka_network_$1_request_throttle_time_ms_total
+        type: COUNTER
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=ResponseSendTimeMs, request=(.+)><>Count
+        name: kafka_network_$1_response_send_time_ms_total
+        type: COUNTER
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=TotalTimeMs, request=(.+)><>Count
+        name: kafka_network_$1_total_time_ms_total
+        type: COUNTER
+        labels:
+          request: "$2"
+      - pattern: kafka.network<type=(.+), name=ErrorsPerSec, request=(.+), error=(.+)><>OneMinuteRate
+        name: kafka_network_$1_errors_per_sec
+        type: GAUGE
+        labels:
+          request: "$2"
+          error: "$3"
+      - pattern: kafka.network<type=(.+), name=ErrorsPerSec, request=(.+), error=(.+)><>Count
+        name: kafka_network_$1_errors_total
+        type: COUNTER
+        labels:
+          request: "$2"
+          error: "$3"
+
+      # Broker and controller metrics
+      - pattern: kafka.controller<type=(.+), name=(.+)><>Value
+        name: kafka_controller_$1_$2
+        type: GAUGE
+      - pattern: kafka.controller<type=(.+), name=(.+)><>OneMinuteRate
+        name: kafka_controller_$1_$2
+        type: GAUGE
+      - pattern: kafka.controller<type=(.+), name=(.+)><>Count
+        name: kafka_controller_$1_$2_total
+        type: COUNTER
+
+      # Broker topic metrics
+      - pattern: kafka.server<type=(.+), name=(.+), topic=(.+)><>OneMinuteRate
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          topic: "$3"
+      - pattern: kafka.server<type=(.+), name=(.+), topic=(.+)><>Count
+        name: kafka_server_$1_$2_total
+        type: COUNTER
+        labels:
+          topic: "$3"
+      - pattern: kafka.server<type=(.+), name=(.+), topic=(.+), partition=(.+)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+        labels:
+          topic: "$3"
+          partition: "$4"
+
+      # Log cleaner metrics
+      - pattern: kafka.log<type=Log, name=(.+), topic=(.+), partition=(.+)><>Value
+        name: kafka_log_$1
+        type: GAUGE
+        labels:
+          topic: "$2"
+          partition: "$3"
+      - pattern: kafka.log<type=Log, name=(.+)><>Value
+        name: kafka_log_$1
+        type: GAUGE
+
+      # Log4j JMX metrics
+      - pattern: kafka.log<type=Log4jController, name=(.+)><>Value
+        name: kafka_log4j_$1
+        type: GAUGE
+
+      # Group coordinator
+      - pattern: kafka.coordinator.group<type=(.+), name=(.+)><>Value
+        name: kafka_coordinator_group_$1_$2
+        type: GAUGE
+      - pattern: kafka.coordinator.group<type=(.+), name=(.+)><>OneMinuteRate
+        name: kafka_coordinator_group_$1_$2
+        type: GAUGE
+      - pattern: kafka.coordinator.group<type=(.+), name=(.+)><>Count
+        name: kafka_coordinator_group_$1_$2_total
+        type: COUNTER
+
+      # Transaction coordinator
+      - pattern: kafka.coordinator.transaction<type=(.+), name=(.+)><>Value
+        name: kafka_coordinator_transaction_$1_$2
+        type: GAUGE
+
+      # Zookeeper client (legacy; harmless for KRaft)
+      - pattern: kafka.server<type=SessionExpireListener, name=(.+)><>Count
+        name: kafka_server_session_expire_listener_$1_total
+        type: COUNTER

@@ -52,3 +52,13 @@ variable "opentelemetry_collector_chart_version" {
   type    = string
   default = "0.159.1"
 }
+
+variable "grafana_chart_version" {
+  type    = string
+  default = "8.10.1"
+}
+
+variable "node_exporter_chart_version" {
+  type    = string
+  default = "4.55.0"
+}

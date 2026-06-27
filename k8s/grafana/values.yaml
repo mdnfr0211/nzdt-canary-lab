@@ -1,0 +1,32 @@
+# Grafana values for monitoring stack
+fullnameOverride: grafana
+
+adminUser: admin
+adminPassword: admin
+
+service:
+  type: ClusterIP
+  port: 80
+
+persistence:
+  enabled: false
+
+# Provisions VictoriaMetrics as the default Prometheus datasource.
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://vmsingle.monitoring.svc:8428
+        isDefault: true
+        editable: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi

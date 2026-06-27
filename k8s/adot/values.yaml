@@ -10,6 +10,15 @@ image:
 serviceAccount:
   create: true
 
+# kubernetes_sd requires cluster-wide read access to pods, services and endpoints.
+clusterRole:
+  create: true
+  name: adot-collector
+  rules:
+    - apiGroups: [""]
+      resources: ["nodes", "nodes/proxy", "services", "endpoints", "pods"]
+      verbs: ["get", "list", "watch"]
+
 configMap:
   create: true
 
@@ -19,6 +28,31 @@ config:
       protocols:
         grpc:
           endpoint: 0.0.0.0:4317
+
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: kubernetes-pods
+            kubernetes_sd_configs:
+              - role: pod
+                namespaces:
+                  names:
+                    - kafka
+                    - monitoring
+                    - app
+            relabel_configs:
+              - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                action: keep
+                regex: "true"
+              - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+                action: replace
+                target_label: __metrics_path__
+                regex: (.+)
+              - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+                action: replace
+                regex: ([^:]+)(?::\d+)?;(\d+)
+                replacement: $1:$2
+                target_label: __address__
 
   processors:
     resource:
@@ -46,7 +80,7 @@ config:
     extensions: [health_check]
     pipelines:
       metrics:
-        receivers: [otlp]
+        receivers: [otlp, prometheus]
         processors: [resource, batch]
         exporters: [prometheusremotewrite]
 

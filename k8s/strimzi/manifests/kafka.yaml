@@ -7,6 +7,18 @@ metadata:
 spec:
   kafka:
     version: "4.1.0"
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics-config
+          key: kafka-metrics-config.yml
+    template:
+      pod:
+        metadata:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9404"
     listeners:
       - name: plain
         port: 9092

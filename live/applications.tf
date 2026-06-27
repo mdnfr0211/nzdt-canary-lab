@@ -382,6 +382,108 @@ resource "kubectl_manifest" "argocd_adot" {
   ]
 }
 
+resource "kubectl_manifest" "argocd_node_exporter" {
+  yaml_body = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "node-exporter"
+      namespace = var.argocd_namespace
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = "2"
+      }
+    }
+    spec = {
+      project = "default"
+      sources = [
+        {
+          repoURL        = "https://prometheus-community.github.io/helm-charts"
+          chart          = "prometheus-node-exporter"
+          targetRevision = var.node_exporter_chart_version
+          helm = {
+            valueFiles = ["$values/k8s/node-exporter/values.yaml"]
+          }
+        },
+        {
+          repoURL        = local.git_repo
+          targetRevision = local.git_branch
+          ref            = "values"
+        },
+      ]
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = "monitoring"
+      }
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = ["CreateNamespace=true"]
+      }
+    }
+  })
+
+  depends_on = [
+    helm_release.argo_cd,
+    kubectl_manifest.argocd_istio_istiod,
+    kubectl_manifest.argocd_argo_rollouts,
+    kubectl_manifest.argocd_strimzi,
+    kubectl_manifest.argocd_victoria_metrics,
+  ]
+}
+
+resource "kubectl_manifest" "argocd_grafana" {
+  yaml_body = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "grafana"
+      namespace = var.argocd_namespace
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = "2"
+      }
+    }
+    spec = {
+      project = "default"
+      sources = [
+        {
+          repoURL        = "https://grafana.github.io/helm-charts"
+          chart          = "grafana"
+          targetRevision = var.grafana_chart_version
+          helm = {
+            valueFiles = ["$values/k8s/grafana/values.yaml"]
+          }
+        },
+        {
+          repoURL        = local.git_repo
+          targetRevision = local.git_branch
+          ref            = "values"
+        },
+      ]
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = "monitoring"
+      }
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = ["CreateNamespace=true"]
+      }
+    }
+  })
+
+  depends_on = [
+    helm_release.argo_cd,
+    kubectl_manifest.argocd_istio_istiod,
+    kubectl_manifest.argocd_argo_rollouts,
+    kubectl_manifest.argocd_strimzi,
+    kubectl_manifest.argocd_victoria_metrics,
+  ]
+}
+
 resource "kubectl_manifest" "argocd_platform" {
   yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
@@ -427,5 +529,7 @@ resource "kubectl_manifest" "argocd_platform" {
     kubectl_manifest.argocd_strimzi_kafka,
     kubectl_manifest.argocd_victoria_metrics,
     kubectl_manifest.argocd_adot,
+    kubectl_manifest.argocd_node_exporter,
+    kubectl_manifest.argocd_grafana,
   ]
 }
