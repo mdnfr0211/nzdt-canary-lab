@@ -33,11 +33,11 @@ gateway:
 worker:
   stableReplicas: 4
   canarySteps:
-    - setMaxSurge: 1
+    - setWeight: 25
     - pause: { duration: 60s }
-    - setMaxSurge: 2
+    - setWeight: 50
     - pause: { duration: 60s }
-    - setMaxSurge: 4
+    - setWeight: 100
     - pause: { duration: 60s }
   analysis:
     errorThreshold: 0.05
