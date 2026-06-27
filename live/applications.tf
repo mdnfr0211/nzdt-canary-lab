@@ -148,7 +148,7 @@ resource "kubectl_manifest" "argocd_strimzi" {
       project = "default"
       sources = [
         {
-          repoURL        = "https://strimzi.io/releases/"
+          repoURL        = "https://strimzi.io/charts/"
           chart          = "strimzi-kafka-operator"
           targetRevision = var.strimzi_chart_version
           helm = {
