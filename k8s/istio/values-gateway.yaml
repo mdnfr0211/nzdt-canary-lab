@@ -1,0 +1,24 @@
+service:
+  type: LoadBalancer
+  ports:
+    - name: http2
+      port: 80
+      targetPort: 8080
+      protocol: HTTP
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: HTTPS
+
+autoscaling:
+  enabled: false
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

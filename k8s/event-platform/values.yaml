@@ -1,0 +1,50 @@
+image:
+  registry: ""
+  gateway: event-gateway
+  worker: event-worker
+  tag: v1
+  pullPolicy: Never
+
+kafka:
+  brokers: my-cluster-kafka-bootstrap.kafka.svc:9092
+  topic: events
+  group: workers
+
+otel:
+  endpoint: adot-collector.monitoring.svc:4317
+
+metrics:
+  vmAddress: http://vmsingle.monitoring.svc:8428
+
+
+gateway:
+  replicas: 4
+  canarySteps:
+    - setWeight: 10
+    - pause: { duration: 60s }
+    - setWeight: 25
+    - pause: { duration: 60s }
+    - setWeight: 50
+    - pause: { duration: 60s }
+    - setWeight: 100
+  analysis:
+    successCondition: "result[0] < 0.05"
+
+worker:
+  stableReplicas: 4
+  canarySteps:
+    - setCanaryScale: { replicas: 1 }
+    - pause: { duration: 60s }
+    - setCanaryScale: { replicas: 2 }
+    - pause: { duration: 60s }
+    - setCanaryScale: { replicas: 4 }
+    - pause: { duration: 60s }
+  analysis:
+    errorThreshold: 0.05
+
+
+notifications:
+  service: revert
+  triggers:
+    - on-rollout-aborted
+    - on-analysis-run-failed

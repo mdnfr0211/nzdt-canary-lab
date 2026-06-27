@@ -1,0 +1,20 @@
+{{- $ns := include "event-platform.namespace" . -}}
+
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: event-gateway-gateway
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  selector:
+    istio: ingressgateway   # matches the default istio-ingressgateway Deployment
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"

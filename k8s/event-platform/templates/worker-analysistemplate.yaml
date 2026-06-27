@@ -1,0 +1,24 @@
+{{- $ns := include "event-platform.namespace" . -}}
+
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: worker-error-rate
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  metrics:
+    - name: worker-error-rate
+      interval: 30s
+      count: 5
+      failureLimit: 1
+      successCondition: "result[0] < {{ .Values.worker.analysis.errorThreshold }}"
+      provider:
+        prometheus:
+          address: {{ .Values.metrics.vmAddress | quote }}
+          query: |
+            sum(rate(worker_events_failed_total{version="v2"}[2m]))
+            /
+            clamp_min(sum(rate(worker_events_processed_total{version="v2"}[2m])), 1)

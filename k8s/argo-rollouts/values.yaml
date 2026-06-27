@@ -1,0 +1,43 @@
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+dashboard:
+  enabled: true
+  service:
+    type: ClusterIP
+
+notifications:
+  configmap:
+    create: true
+  secret:
+    create: false
+  notifiers:
+    service.webhook.revert: |
+      url: http://webhook-revert.app.svc.cluster.local:8080/rollback
+      method: POST
+      headers:
+        - name: Content-Type
+          value: application/json
+  templates:
+    template.rollback-pr: |
+      message: |
+        {
+          "rollout":   "{{ .rollout.name }}",
+          "namespace": "{{ .rollout.namespace }}",
+          "status":    "{{ .rollout.status.phase }}",
+          "revision":  "{{ .rollout.status.currentPodHash }}",
+          "time":      "{{ .time }}"
+        }
+  triggers:
+    trigger.on-rollout-aborted: |
+      - send: [rollback-pr]
+        when: "true"
+    trigger.on-analysis-run-failed: |
+      - send: [rollback-pr]
+        when: "true"

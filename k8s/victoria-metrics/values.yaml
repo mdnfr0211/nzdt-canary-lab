@@ -1,0 +1,30 @@
+fullnameOverride: vmsingle
+
+server:
+  replicaCount: 1
+  image:
+    repository: victoriametrics/victoria-metrics
+    tag: v1.108.1
+    pullPolicy: IfNotPresent
+
+  persistentVolume:
+    enabled: false
+
+  storageDataPath: /storage
+  retentionPeriod: "7d"
+
+  extraArgs:
+    httpListenAddr: ":8428"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  service:
+    type: ClusterIP
+    servicePort: 8428
+    portName: http

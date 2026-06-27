@@ -1,0 +1,29 @@
+global:
+  proxy:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    logLevel: warning
+
+pilot:
+  autoscaleEnabled: false
+  resources:
+    requests:
+      cpu: 250m
+      memory: 384Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi
+
+meshConfig:
+  enablePrometheusMerge: true
+  defaultConfig:
+    proxyStatsMatcher:
+      inclusionRegexps:
+        - ".*"
+  accessLogFile: /dev/stdout
+  accessLogEncoding: JSON

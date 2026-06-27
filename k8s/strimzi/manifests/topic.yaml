@@ -1,0 +1,14 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: events
+  labels:
+    app.kubernetes.io/part-of: event-platform
+    strimzi.io/cluster: my-cluster
+spec:
+  partitions: 12
+  replicas: 1
+  config:
+    "retention.ms": "604800000"
+    "segment.bytes": "104857600"
+    "cleanup.policy": "delete"

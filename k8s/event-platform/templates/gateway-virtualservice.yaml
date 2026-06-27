@@ -1,0 +1,28 @@
+{{- $ns := include "event-platform.namespace" . -}}
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: event-gateway
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  gateways:
+    - event-gateway-gateway
+  hosts:
+    - "*"
+  http:
+    - name: primary
+      route:
+        - destination:
+            host: event-gateway-stable.{{ $ns }}.svc.cluster.local
+            port:
+              number: 80
+          weight: 100
+        - destination:
+            host: event-gateway-canary.{{ $ns }}.svc.cluster.local
+            port:
+              number: 80
+          weight: 0

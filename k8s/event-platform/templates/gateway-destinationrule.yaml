@@ -1,0 +1,17 @@
+{{- $ns := include "event-platform.namespace" . -}}
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: event-gateway
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  host: event-gateway-stable.{{ $ns }}.svc.cluster.local
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s

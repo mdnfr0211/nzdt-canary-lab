@@ -1,0 +1,58 @@
+{{- $ns := include "event-platform.namespace" . -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-gateway
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "event-platform.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-gateway-stable
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+    rollouts.argoproj.io/service-role: stable
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "event-platform.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-gateway-canary
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+    rollouts.argoproj.io/service-role: canary
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "event-platform.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

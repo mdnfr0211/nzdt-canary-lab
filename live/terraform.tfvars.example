@@ -1,0 +1,13 @@
+gitops_repo_url         = "https://github.com/mdnfr0211/nzdt-canary-lab.git"
+gitops_target_revision  = "main"
+
+argocd_chart_version                  = "10.0.0"
+argocd_namespace                      = "argocd"
+istio_chart_version                   = "1.30.2"
+argo_rollouts_chart_version           = "2.41.0"
+strimzi_chart_version                 = "1.0.0"
+victoria_metrics_chart_version        = "0.41.0"
+opentelemetry_collector_chart_version = "0.159.1"
+
+kubeconfig_path    = "~/.kube/config"
+kubernetes_context = "minikube"

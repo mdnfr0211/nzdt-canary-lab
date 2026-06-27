@@ -1,0 +1,50 @@
+{{- $ns := include "event-platform.namespace" . -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: event-gateway-role
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+rules: []   # intentionally empty (least privilege)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: event-gateway-rb
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: event-gateway-sa
+    namespace: {{ $ns }}
+roleRef:
+  kind: Role
+  name: event-gateway-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: event-worker-role
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+rules: []   # intentionally empty (least privilege)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: event-worker-rb
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: event-worker-sa
+    namespace: {{ $ns }}
+roleRef:
+  kind: Role
+  name: event-worker-role
+  apiGroup: rbac.authorization.k8s.io

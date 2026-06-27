@@ -1,0 +1,57 @@
+{{- $ns := include "event-platform.namespace" . -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: event-worker
+  namespace: {{ $ns }}
+  labels:
+    {{- include "event-platform.labels" . | nindent 4 }}
+  annotations:
+    notifications.argoproj.io/subscribe.on-rollout-aborted.{{ .Values.notifications.service }}: ""
+    notifications.argoproj.io/subscribe.on-analysis-run-failed.{{ .Values.notifications.service }}: ""
+spec:
+  replicas: {{ .Values.worker.stableReplicas }}
+  selector:
+    matchLabels:
+      {{- include "event-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  strategy:
+    canary:
+      steps:
+        {{- toYaml .Values.worker.canarySteps | nindent 8 }}
+      analysis:
+        templates:
+          - templateName: worker-error-rate
+        startingStep: 0
+  template:
+    metadata:
+      labels:
+        {{- include "event-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: event-worker-sa
+      containers:
+        - name: event-worker
+          image: {{ include "event-platform.workerImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: KAFKA_BROKERS
+              value: {{ .Values.kafka.brokers | quote }}
+            - name: KAFKA_TOPIC
+              value: {{ .Values.kafka.topic | quote }}
+            - name: KAFKA_GROUP
+              value: {{ .Values.kafka.group | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: APP_VERSION
+              value: {{ .Values.image.tag | quote }}
+            # Single-knob versioning: SCHEMA_STRICT auto-derives from image.tag == "v2".
+            - name: SCHEMA_STRICT
+              value: {{ include "event-platform.schemaStrict" . }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi

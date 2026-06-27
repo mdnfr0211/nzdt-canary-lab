@@ -1,0 +1,66 @@
+fullnameOverride: adot-collector
+
+mode: deployment
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: "0.110.0"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+
+configMap:
+  create: true
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+  processors:
+    resource:
+      attributes:
+        - key: service.name
+          action: upsert
+          from_attribute: service.name
+        - key: service.version
+          action: upsert
+          from_attribute: service.version
+    batch:
+      timeout: 5s
+      send_batch_size: 1024
+
+  exporters:
+    prometheusremotewrite:
+      endpoint: http://vmsingle.monitoring.svc:8428/api/v1/write
+      resource_to_telemetry_conversion:
+        enabled: true
+
+  extensions:
+    health_check: {}
+
+  service:
+    extensions: [health_check]
+    pipelines:
+      metrics:
+        receivers: [otlp]
+        processors: [resource, batch]
+        exporters: [prometheusremotewrite]
+
+ports:
+  otlp-grpc:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    hostPort: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

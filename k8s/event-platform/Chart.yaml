@@ -1,0 +1,14 @@
+apiVersion: v2
+name: event-platform
+description: |
+  Near-Zero-Downtime canary platform: an event-gateway (HTTP -> Kafka, Istio
+  weighted canary) and an event-worker (Kafka consumer, replica-ratio canary via
+  setCanaryScale). Health is gated by OTLP metrics -> ADOT -> VictoriaMetrics,
+  queried by Argo Rollouts AnalysisTemplates. On analysis failure the Rollouts
+  abort (canary weight/replicas to 0, Rollout -> Degraded); v1 of this chart does
+  NOT auto-open a revert PR (webhook-revert is a deferred extension).
+type: application
+version: 0.1.0
+appVersion: "1.0"
+maintainers:
+  - name: navfar
