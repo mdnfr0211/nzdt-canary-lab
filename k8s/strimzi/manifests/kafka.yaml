@@ -4,8 +4,6 @@ metadata:
   name: my-cluster
   labels:
     app.kubernetes.io/part-of: event-platform
-    strimzi.io/kind: kafka
-    strimzi.io/cluster: my-cluster
 spec:
   kafka:
     version: "4.1.0"
@@ -28,13 +26,5 @@ spec:
       "min.insync.replicas": "1"
       "inter.broker.protocol.version": "4.1"
       "log.message.format.version": "4.1"
-    resources:
-      requests:
-        cpu: 200m
-        memory: 512Mi
-      limits:
-        cpu: "1"
-        memory: 1Gi
   entityOperator:
-    topicOperator:
-      autoCreateTopicEnable: false
+    topicOperator: {}

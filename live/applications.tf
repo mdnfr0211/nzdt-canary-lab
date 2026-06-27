@@ -37,6 +37,14 @@ resource "kubectl_manifest" "argocd_istio_base" {
         }
         syncOptions = ["CreateNamespace=true"]
       }
+      ignoreDifferences = [
+        {
+          group        = "admissionregistration.k8s.io"
+          kind         = "ValidatingWebhookConfiguration"
+          name         = "istiod-default-validator"
+          jsonPointers = ["/webhooks/0/failurePolicy"]
+        }
+      ]
     }
   })
 
@@ -82,6 +90,14 @@ resource "kubectl_manifest" "argocd_istio_istiod" {
         }
         syncOptions = ["CreateNamespace=true"]
       }
+      ignoreDifferences = [
+        {
+          group        = "admissionregistration.k8s.io"
+          kind         = "ValidatingWebhookConfiguration"
+          name         = "istio-validator-istio-system"
+          jsonPointers = ["/webhooks/0/failurePolicy"]
+        }
+      ]
     }
   })
 
