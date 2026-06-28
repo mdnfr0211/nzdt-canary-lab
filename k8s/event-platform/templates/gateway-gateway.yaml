@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/component: gateway
 spec:
   selector:
-    istio: ingressgateway   # matches the default istio-ingressgateway Deployment
+    istio: gateway   # matches the istio-gateway Deployment installed by k8s/istio/values-gateway.yaml
   servers:
     - port:
         number: 80
