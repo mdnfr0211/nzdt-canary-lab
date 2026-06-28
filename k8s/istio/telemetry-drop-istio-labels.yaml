@@ -1,0 +1,27 @@
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: drop-istio-labels
+  namespace: istio-system
+spec:
+  metrics:
+    - overrides:
+        - match:
+            metric: ALL_METRICS
+          tagOverrides:
+            connection_security_policy:
+              operation: REMOVE
+            destination_cluster:
+              operation: REMOVE
+            destination_principal:
+              operation: REMOVE
+            destination_canonical_revision:
+              operation: REMOVE
+            destination_version:
+              operation: REMOVE
+            source_cluster:
+              operation: REMOVE
+            source_principal:
+              operation: REMOVE
+            source_canonical_revision:
+              operation: REMOVE
