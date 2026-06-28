@@ -15,6 +15,7 @@ server:
 
   extraArgs:
     httpListenAddr: ":8428"
+    maxLabelsPerTimeseries: "60"
 
   resources:
     requests:
