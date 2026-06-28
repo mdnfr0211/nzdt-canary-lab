@@ -19,7 +19,7 @@ datasources:
       - name: Prometheus
         type: prometheus
         access: proxy
-        url: http://vmsingle.monitoring.svc:8428
+        url: http://vmsingle-server.monitoring.svc:8428
         isDefault: true
         editable: false
 
