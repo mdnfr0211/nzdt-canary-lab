@@ -81,6 +81,44 @@ config:
                 target_label: strimzi_io_kind
                 regex: (.+)
 
+          # Istio sidecar metrics (port 15020). Kept separate from the generic pod
+          # scrape so we can drop the high-cardinality envoy_* metrics and keep only
+          # the request counters the canary analysis needs.
+          - job_name: kubernetes-pods-istio
+            kubernetes_sd_configs:
+              - role: pod
+                namespaces:
+                  names:
+                    - kafka
+                    - monitoring
+                    - app
+            relabel_configs:
+              - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                action: keep
+                regex: "true"
+              - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+                action: keep
+                regex: "15020"
+              - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+                action: replace
+                target_label: __metrics_path__
+                regex: (.+)
+              - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+                action: replace
+                regex: ([^:]+)(?::\d+)?;(\d+)
+                replacement: $1:$2
+                target_label: __address__
+              - source_labels: [__meta_kubernetes_namespace]
+                action: replace
+                target_label: namespace
+              - source_labels: [__meta_kubernetes_pod_name]
+                action: replace
+                target_label: kubernetes_pod_name
+            metric_relabel_configs:
+              - source_labels: [__name__]
+                action: keep
+                regex: "istio_requests_total"
+
           # cAdvisor (embedded in kubelet) exposes container_* metrics used by the
           # Strimzi dashboard CPU/Memory panels. Scraped via the API-server proxy,
           # which works on minikube without needing direct kubelet TLS access.
