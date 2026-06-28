@@ -39,3 +39,15 @@ spec:
       "log.message.format.version": "4.1"
   entityOperator:
     topicOperator: {}
+  # kafka-exporter exposes consumer-group lag and per-topic/partition offset
+  # metrics that the JMX exporter does NOT provide. It serves Prometheus metrics
+  # on port 9404; annotate the pod so the ADOT pod-SD scrape job picks it up.
+  kafkaExporter:
+    topicRegex: ".*"
+    groupRegex: ".*"
+    template:
+      pod:
+        metadata:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9404"
