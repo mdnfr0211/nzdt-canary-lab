@@ -40,6 +40,7 @@ config:
                     - kafka
                     - monitoring
                     - app
+                    - istio-system
             relabel_configs:
               - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
                 action: keep
@@ -92,6 +93,7 @@ config:
                     - kafka
                     - monitoring
                     - app
+                    - istio-system
             relabel_configs:
               - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
                 action: keep
@@ -117,7 +119,7 @@ config:
             metric_relabel_configs:
               - source_labels: [__name__]
                 action: keep
-                regex: "istio_requests_total"
+                regex: "istio_requests_total|istio_request_duration_milliseconds.*"
 
           # cAdvisor (embedded in kubelet) exposes container_* metrics used by the
           # Strimzi dashboard CPU/Memory panels. Scraped via the API-server proxy,
