@@ -30,6 +30,25 @@ type event struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
+type responseRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rr *responseRecorder) WriteHeader(code int) {
+	rr.status = code
+	rr.ResponseWriter.WriteHeader(code)
+}
+
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rr := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rr, r)
+		log.Printf("%s %s %d %s", r.Method, r.URL.Path, rr.status, time.Since(start))
+	})
+}
+
 type config struct {
 	kafkaBrokers string
 	kafkaTopic   string
@@ -137,7 +156,7 @@ func main() {
 			cfg.otlpEndpoint, "event-gateway", cfg.appVersion)
 	})
 
-	server := &http.Server{Addr: cfg.listenAddr, Handler: mux}
+	server := &http.Server{Addr: cfg.listenAddr, Handler: logRequests(mux)}
 	go func() {
 		log.Printf("event-gateway %s listening on %s (kafka=%s topic=%s)",
 			cfg.appVersion, cfg.listenAddr, cfg.kafkaBrokers, cfg.kafkaTopic)
