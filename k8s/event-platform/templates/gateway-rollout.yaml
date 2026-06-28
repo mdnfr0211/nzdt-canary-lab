@@ -34,6 +34,10 @@ spec:
         startingStep: 0
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /stats/prometheus
+        prometheus.io/port: "15020"
       labels:
         {{- include "event-platform.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: gateway
