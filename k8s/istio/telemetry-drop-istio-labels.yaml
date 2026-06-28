@@ -11,17 +11,39 @@ spec:
           tagOverrides:
             connection_security_policy:
               operation: REMOVE
+            destination_canonical_revision:
+              operation: REMOVE
             destination_cluster:
               operation: REMOVE
             destination_principal:
               operation: REMOVE
-            destination_canonical_revision:
-              operation: REMOVE
-            destination_version:
+            source_canonical_revision:
               operation: REMOVE
             source_cluster:
               operation: REMOVE
             source_principal:
               operation: REMOVE
-            source_canonical_revision:
+            destination_version:
               operation: REMOVE
+            source_canonical_service:
+              operation: REMOVE
+            destination_canonical_service:
+              operation: REMOVE
+---
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: mesh-metrics
+  namespace: istio-system
+spec:
+  metrics:
+    - overrides:
+        - match:
+            metric: REQUEST_COUNT
+          tagOverrides:
+            request_path:
+              operation: UPSERT
+              value: "request.url_path"
+            request_method:
+              operation: UPSERT
+              value: "request.method"
