@@ -14,7 +14,7 @@ otel:
   endpoint: adot-collector.monitoring.svc:4317
 
 metrics:
-  vmAddress: http://vmsingle.monitoring.svc:8428
+  vmAddress: http://vmsingle-server.monitoring.svc:8428
 
 
 gateway:
