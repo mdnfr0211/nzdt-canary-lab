@@ -44,6 +44,11 @@ config:
               - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
                 action: keep
                 regex: "true"
+              # Istio injects prometheus.io/scrape on app pods pointing to the Envoy sidecar (port 15020/15090).
+              # Drop those targets to avoid high-cardinality envoy_* metrics; gateway/worker already push OTLP.
+              - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+                action: drop
+                regex: "15020|15090"
               - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
                 action: replace
                 target_label: __metrics_path__
