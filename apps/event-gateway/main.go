@@ -24,9 +24,6 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
-// event is the envelope the gateway validates. The deep payload is intentionally
-// not validated here: the gateway must stay healthy even when the worker rejects
-// bad payloads (scenario 2).
 type event struct {
 	UserID  string          `json:"user_id"`
 	Type    string          `json:"type"`
@@ -51,11 +48,11 @@ func loadConfig() config {
 	}
 }
 
-func getenv(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
+func getenv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
-	return def
+	return defaultValue
 }
 
 func main() {
@@ -64,14 +61,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	mp, err := initMeterProvider(ctx, cfg)
+	meterProvider, err := initMeterProvider(ctx, cfg)
 	if err != nil {
 		log.Fatalf("init metrics: %v", err)
 	}
 	defer func() {
-		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = mp.Shutdown(shutCtx)
+		_ = meterProvider.Shutdown(shutdownCtx)
 	}()
 
 	meter := otel.Meter("event-gateway")
@@ -79,15 +76,15 @@ func main() {
 		metric.WithDescription("Total events received by the gateway"))
 	produceErrors, _ := meter.Int64Counter("gateway_produce_errors_total",
 		metric.WithDescription("Kafka produce failures"))
-	duration, _ := meter.Float64Histogram("gateway_request_duration_seconds",
+	requestDuration, _ := meter.Float64Histogram("gateway_request_duration_seconds",
 		metric.WithDescription("HTTP /event handling duration"))
 
 	writer := &kafka.Writer{
 		Addr:         kafka.TCP(strings.Split(cfg.kafkaBrokers, ",")...),
 		Topic:        cfg.kafkaTopic,
-		Balancer:     &kafka.Hash{}, // key = user_id -> sticky partitioning
+		Balancer:     &kafka.Hash{},
 		RequiredAcks: kafka.RequireAll,
-		BatchSize:    1, // demo: send each event promptly for predictable canary load
+		BatchSize:    1,
 	}
 	defer writer.Close()
 
@@ -98,81 +95,73 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
-		// ready as long as the writer is constructed; Kafka liveness is the
-		// canary's concern, not the readiness gate.
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 
 	mux.HandleFunc("/event", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		attrs := []attribute.KeyValue{attribute.String("version", cfg.appVersion)}
+		metricAttrs := metric.WithAttributes(attribute.String("version", cfg.appVersion))
+		defer requestsTotal.Add(ctx, 1, metricAttrs)
 
-		var ev event
-		if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
-			requestsTotal.Add(ctx, 1, metric.WithAttributes(attrs...))
+		var evt event
+		if err := json.NewDecoder(r.Body).Decode(&evt); err != nil {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
-		// Envelope validation only. Only user_id + type are required.
-		if ev.UserID == "" || (ev.Type != "click" && ev.Type != "buy") {
-			requestsTotal.Add(ctx, 1, metric.WithAttributes(attrs...))
+		if evt.UserID == "" || (evt.Type != "click" && evt.Type != "buy") {
 			http.Error(w, "invalid envelope: user_id and type (click|buy) required", http.StatusBadRequest)
 			return
 		}
 
-		// Produce to Kafka with key = user_id (sticky).
-		msg := kafka.Message{
-			Key:   []byte(ev.UserID),
-			Value: mustJSON(ev),
+		message := kafka.Message{
+			Key:   []byte(evt.UserID),
+			Value: mustJSON(evt),
 		}
-		wctx, wcancel := context.WithTimeout(ctx, 5*time.Second)
-		defer wcancel()
-		if err := writer.WriteMessages(wctx, msg); err != nil {
-			produceErrors.Add(ctx, 1, metric.WithAttributes(attrs...))
-			requestsTotal.Add(ctx, 1, metric.WithAttributes(attrs...))
+		writeCtx, cancelWrite := context.WithTimeout(ctx, 5*time.Second)
+		defer cancelWrite()
+		if err := writer.WriteMessages(writeCtx, message); err != nil {
+			produceErrors.Add(ctx, 1, metricAttrs)
 			http.Error(w, "produce failed", http.StatusBadGateway)
 			return
 		}
 
-		requestsTotal.Add(ctx, 1, metric.WithAttributes(attrs...))
-		duration.Record(ctx, time.Since(start).Seconds(), metric.WithAttributes(attrs...))
+		requestDuration.Record(ctx, time.Since(start).Seconds(), metricAttrs)
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte("accepted"))
 	})
 
-	// /metrics is informational; primary metrics path is OTLP push to ADOT.
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = fmt.Fprintf(w, "# OTLP metrics push to %s (app=%s, version=%s)\n",
 			cfg.otlpEndpoint, "event-gateway", cfg.appVersion)
 	})
 
-	srv := &http.Server{Addr: cfg.listenAddr, Handler: mux}
+	server := &http.Server{Addr: cfg.listenAddr, Handler: mux}
 	go func() {
 		log.Printf("event-gateway %s listening on %s (kafka=%s topic=%s)",
 			cfg.appVersion, cfg.listenAddr, cfg.kafkaBrokers, cfg.kafkaTopic)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %v", err)
 		}
 	}()
 
 	<-ctx.Done()
 	log.Println("shutting down...")
-	sctx, scancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer scancel()
-	_ = srv.Shutdown(sctx)
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
+	_ = server.Shutdown(shutdownCtx)
 }
 
 func initMeterProvider(ctx context.Context, cfg config) (*sdkmetric.MeterProvider, error) {
-	exp, err := otlpmetricgrpc.New(ctx,
+	exporter, err := otlpmetricgrpc.New(ctx,
 		otlpmetricgrpc.WithEndpoint(cfg.otlpEndpoint),
 		otlpmetricgrpc.WithInsecure(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("otlp metric exporter: %w", err)
 	}
-	res, err := resource.New(ctx,
+	serviceResource, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName("event-gateway"),
 			semconv.ServiceVersion(cfg.appVersion),
@@ -181,15 +170,15 @@ func initMeterProvider(ctx context.Context, cfg config) (*sdkmetric.MeterProvide
 	if err != nil {
 		return nil, fmt.Errorf("resource: %w", err)
 	}
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exp, sdkmetric.WithInterval(15*time.Second))),
-		sdkmetric.WithResource(res),
+	meterProvider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter, sdkmetric.WithInterval(15*time.Second))),
+		sdkmetric.WithResource(serviceResource),
 	)
-	otel.SetMeterProvider(mp)
-	return mp, nil
+	otel.SetMeterProvider(meterProvider)
+	return meterProvider, nil
 }
 
-func mustJSON(v event) []byte {
-	b, _ := json.Marshal(v)
-	return b
+func mustJSON(evt event) []byte {
+	payload, _ := json.Marshal(evt)
+	return payload
 }

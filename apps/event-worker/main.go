@@ -23,18 +23,12 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
-// event mirrors the gateway envelope. The worker re-decodes payload and may
-// apply schema checks. NOTE: the worker validates the SAME envelope shape the
-// gateway accepted, plus (when strict) the deep-payload contract that scenario
-// 2's bad-payload generator violates.
 type event struct {
 	UserID  string          `json:"user_id"`
 	Type    string          `json:"type"`
 	Payload json.RawMessage `json:"payload"`
 }
 
-// strictPayload is the "new schema" v2 enforces. v1 (tolerant) ignores these.
-// Scenario 2's bad generator omits `item_id`, which v2 marks as required.
 type strictPayload struct {
 	ItemID   string `json:"item_id"`
 	Amount   int    `json:"amount"`
@@ -61,11 +55,11 @@ func loadConfig() config {
 	}
 }
 
-func getenv(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
+func getenv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
-	return def
+	return defaultValue
 }
 
 func main() {
@@ -74,42 +68,39 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	mp, err := initMeterProvider(ctx, cfg)
+	meterProvider, err := initMeterProvider(ctx, cfg)
 	if err != nil {
 		log.Fatalf("init metrics: %v", err)
 	}
 	defer func() {
-		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = mp.Shutdown(shutCtx)
+		_ = meterProvider.Shutdown(shutdownCtx)
 	}()
 
 	meter := otel.Meter("event-worker")
-	attrs := []attribute.KeyValue{attribute.String("version", cfg.appVersion)}
+	metricAttrs := []attribute.KeyValue{attribute.String("version", cfg.appVersion)}
 	processedTotal, _ := meter.Int64Counter("worker_events_processed_total",
 		metric.WithDescription("Events consumed from Kafka"))
 	failedTotal, _ := meter.Int64Counter("worker_events_failed_total",
 		metric.WithDescription("Events rejected by schema/validation (canary failure trigger)"))
-	duration, _ := meter.Float64Histogram("worker_event_process_duration_seconds",
+	processDuration, _ := meter.Float64Histogram("worker_event_process_duration_seconds",
 		metric.WithDescription("Per-event processing duration"))
 
-	// One reader per worker pod, joining the SHARED consumer group `workers`.
-	// Both v1 and v2 join the same group -> partitions are shared across all
-	// members; Kafka assigns ~canaryReplicas/total partitions to canary pods.
-	r := kafka.NewReader(kafka.ReaderConfig{
+	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  strings.Split(cfg.kafkaBrokers, ","),
 		GroupID:  cfg.kafkaGroup,
 		Topic:    cfg.kafkaTopic,
 		MinBytes: 1,
 		MaxBytes: 10e6,
 	})
-	defer r.Close()
+	defer reader.Close()
 
 	log.Printf("event-worker %s starting (group=%s topic=%s strict=%v)",
 		cfg.appVersion, cfg.kafkaGroup, cfg.kafkaTopic, cfg.schemaStrict)
 
 	for {
-		if err := consume(ctx, r, cfg, processedTotal, failedTotal, duration, attrs); err != nil {
+		if err := consume(ctx, reader, cfg, processedTotal, failedTotal, processDuration, metricAttrs); err != nil {
 			if errors.Is(err, context.Canceled) {
 				return
 			}
@@ -123,73 +114,66 @@ func main() {
 	}
 }
 
-func consume(ctx context.Context, r *kafka.Reader, cfg config,
-	processed, failed metric.Int64Counter,
-	dur metric.Float64Histogram,
-	attrs []attribute.KeyValue,
+func consume(ctx context.Context, reader *kafka.Reader, cfg config,
+	processedTotal, failedTotal metric.Int64Counter,
+	processDuration metric.Float64Histogram,
+	metricAttrs []attribute.KeyValue,
 ) error {
-	// FetchMessage lets us commit manually after processing, so a rejected
-	// (DLQ-logged) message still commits and is not redelivered -> no shared-
-	// state corruption, no poison-message loop.
-	m, err := r.FetchMessage(ctx)
+
+	message, err := reader.FetchMessage(ctx)
 	if err != nil {
 		return err
 	}
 	start := time.Now()
 
-	if perr := process(ctx, m, cfg, processed, failed, attrs); perr != nil {
-		// Failure path: increment failed counter, log to DLQ path (stdout).
-		failed.Add(ctx, 1, metric.WithAttributes(attrs...))
+	if processErr := process(message, cfg); processErr != nil {
+
+		failedTotal.Add(ctx, 1, metric.WithAttributes(metricAttrs...))
 		log.Printf("[DLQ] version=%s partition=%d offset=%d key=%s reject=%v",
-			cfg.appVersion, m.Partition, m.Offset, string(m.Key), perr)
+			cfg.appVersion, message.Partition, message.Offset, string(message.Key), processErr)
 	}
 
-	processed.Add(ctx, 1, metric.WithAttributes(attrs...))
-	dur.Record(ctx, time.Since(start).Seconds(), metric.WithAttributes(attrs...))
+	processedTotal.Add(ctx, 1, metric.WithAttributes(metricAttrs...))
+	processDuration.Record(ctx, time.Since(start).Seconds(), metric.WithAttributes(metricAttrs...))
 
-	if err := r.CommitMessages(ctx, m); err != nil {
+	if err := reader.CommitMessages(ctx, message); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
 	return nil
 }
 
-// process validates one message. The error returned here is what the worker
-// failure injection hinges on.
-func process(ctx context.Context, m kafka.Message, cfg config,
-	processed, failed metric.Int64Counter, attrs []attribute.KeyValue) error {
-	var ev event
-	if err := json.Unmarshal(m.Value, &ev); err != nil {
+func process(message kafka.Message, cfg config) error {
+	var evt event
+	if err := json.Unmarshal(message.Value, &evt); err != nil {
 		return fmt.Errorf("malformed envelope")
 	}
 	if !cfg.schemaStrict {
-		return nil // v1 tolerant path: accept anything with a valid envelope
+		return nil
 	}
 
-	// v2 strict path: enforce the new deep schema. Scenario 2's bad generator
-	// omits `item_id` -> this rejects and returns the DLQ error.
-	var p strictPayload
-	if err := json.Unmarshal(ev.Payload, &p); err != nil {
+	var payload strictPayload
+	if err := json.Unmarshal(evt.Payload, &payload); err != nil {
 		return fmt.Errorf("payload unmarshal: %w", err)
 	}
-	if p.ItemID == "" {
+	if payload.ItemID == "" {
 		return fmt.Errorf("missing required field: item_id")
 	}
-	// Happy path: write to sink (log-only for demo).
-	if ev.Type == "buy" && p.Amount > 0 {
-		_ = p // sink write elided (log-only)
+
+	if evt.Type == "buy" && payload.Amount > 0 {
+		_ = payload
 	}
 	return nil
 }
 
 func initMeterProvider(ctx context.Context, cfg config) (*sdkmetric.MeterProvider, error) {
-	exp, err := otlpmetricgrpc.New(ctx,
+	exporter, err := otlpmetricgrpc.New(ctx,
 		otlpmetricgrpc.WithEndpoint(cfg.otlpEndpoint),
 		otlpmetricgrpc.WithInsecure(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("otlp metric exporter: %w", err)
 	}
-	res, err := resource.New(ctx,
+	serviceResource, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName("event-worker"),
 			semconv.ServiceVersion(cfg.appVersion),
@@ -198,10 +182,10 @@ func initMeterProvider(ctx context.Context, cfg config) (*sdkmetric.MeterProvide
 	if err != nil {
 		return nil, fmt.Errorf("resource: %w", err)
 	}
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exp, sdkmetric.WithInterval(15*time.Second))),
-		sdkmetric.WithResource(res),
+	meterProvider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter, sdkmetric.WithInterval(15*time.Second))),
+		sdkmetric.WithResource(serviceResource),
 	)
-	otel.SetMeterProvider(mp)
-	return mp, nil
+	otel.SetMeterProvider(meterProvider)
+	return meterProvider, nil
 }
