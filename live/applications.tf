@@ -244,6 +244,44 @@ resource "kubectl_manifest" "argocd_istio_gateway" {
   ]
 }
 
+resource "kubectl_manifest" "argocd_istio_manifests" {
+  yaml_body = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "istio-manifests"
+      namespace = var.argocd_namespace
+      annotations = {
+        "argocd.argoproj.io/sync-wave" = "2"
+      }
+    }
+    spec = {
+      project = "default"
+      source = {
+        repoURL        = local.git_repo
+        targetRevision = local.git_branch
+        path           = "k8s/istio/manifests"
+      }
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = "istio-system"
+      }
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = ["CreateNamespace=true"]
+      }
+    }
+  })
+
+  depends_on = [
+    helm_release.argo_cd,
+    kubectl_manifest.argocd_istio_istiod,
+  ]
+}
+
 resource "kubectl_manifest" "argocd_strimzi_kafka" {
   yaml_body = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
