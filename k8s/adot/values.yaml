@@ -58,6 +58,28 @@ config:
                 regex: ([^:]+)(?::\d+)?;(\d+)
                 replacement: $1:$2
                 target_label: __address__
+              # Expose namespace + pod name as metric labels (Strimzi Grafana dashboard
+              # filters on `namespace` and `kubernetes_pod_name`).
+              - source_labels: [__meta_kubernetes_namespace]
+                action: replace
+                target_label: namespace
+              - source_labels: [__meta_kubernetes_pod_name]
+                action: replace
+                target_label: kubernetes_pod_name
+              # Map Strimzi pod labels -> metric labels used by the official dashboard
+              # (`strimzi_io_cluster`, `strimzi_io_name`, `strimzi_io_kind`).
+              - source_labels: [__meta_kubernetes_pod_label_strimzi_io_cluster]
+                action: replace
+                target_label: strimzi_io_cluster
+                regex: (.+)
+              - source_labels: [__meta_kubernetes_pod_label_strimzi_io_name]
+                action: replace
+                target_label: strimzi_io_name
+                regex: (.+)
+              - source_labels: [__meta_kubernetes_pod_label_strimzi_io_kind]
+                action: replace
+                target_label: strimzi_io_kind
+                regex: (.+)
 
   processors:
     resource:
