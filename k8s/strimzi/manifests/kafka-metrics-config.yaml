@@ -47,7 +47,7 @@ data:
         labels:
           listener: "$2"
           networkProcessor: "$3"
-      - pattern: kafka.server<type=(.+)><>(.+):
+      - pattern: "kafka.server<type=(.+)><>(.+):"
         name: kafka_server_$1_$2
         type: GAUGE
 
