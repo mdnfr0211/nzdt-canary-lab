@@ -29,6 +29,8 @@ spec:
               operation: REMOVE
             destination_canonical_service:
               operation: REMOVE
+            reporter:
+              operation: REMOVE
 ---
 apiVersion: telemetry.istio.io/v1
 kind: Telemetry
@@ -43,7 +45,7 @@ spec:
           tagOverrides:
             request_path:
               operation: UPSERT
-              value: "request.url_path"
+              value: "request.path"
             request_method:
               operation: UPSERT
               value: "request.method"
