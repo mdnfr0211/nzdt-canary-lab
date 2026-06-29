@@ -1,3 +1,6 @@
+# Note: instance, job, k8s_*, kubernetes_*, net_*, server_*, service_*, url_scheme,
+# and http_scheme are Prometheus/OTel scrape labels. They cannot be removed here.
+# Drop those with Prometheus metric_relabel_configs or OTel collector processors.
 apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
@@ -11,25 +14,35 @@ spec:
           tagOverrides:
             connection_security_policy:
               operation: REMOVE
+            destination_app:
+              operation: REMOVE
             destination_canonical_revision:
+              operation: REMOVE
+            destination_canonical_service:
               operation: REMOVE
             destination_cluster:
               operation: REMOVE
             destination_principal:
               operation: REMOVE
+            destination_version:
+              operation: REMOVE
+            reporter:
+              operation: REMOVE
+            source_app:
+              operation: REMOVE
             source_canonical_revision:
+              operation: REMOVE
+            source_canonical_service:
               operation: REMOVE
             source_cluster:
               operation: REMOVE
             source_principal:
               operation: REMOVE
-            destination_version:
+            source_version:
               operation: REMOVE
-            source_canonical_service:
+            source_workload:
               operation: REMOVE
-            destination_canonical_service:
-              operation: REMOVE
-            reporter:
+            source_workload_namespace:
               operation: REMOVE
         - match:
             metric: REQUEST_COUNT
