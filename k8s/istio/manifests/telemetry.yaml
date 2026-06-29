@@ -1,7 +1,7 @@
 apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
-  name: drop-istio-labels
+  name: mesh-metrics
   namespace: istio-system
 spec:
   metrics:
@@ -31,15 +31,6 @@ spec:
               operation: REMOVE
             reporter:
               operation: REMOVE
----
-apiVersion: telemetry.istio.io/v1
-kind: Telemetry
-metadata:
-  name: mesh-metrics
-  namespace: istio-system
-spec:
-  metrics:
-    - overrides:
         - match:
             metric: REQUEST_COUNT
           tagOverrides:
