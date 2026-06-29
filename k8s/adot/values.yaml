@@ -120,6 +120,8 @@ config:
               - source_labels: [__name__]
                 action: keep
                 regex: "istio_requests_total|istio_request_duration_milliseconds.*"
+              - regex: "^(instance|job|kubernetes_.*)$"
+                action: labeldrop
 
           # cAdvisor (embedded in kubelet) exposes container_* metrics used by the
           # Strimzi dashboard CPU/Memory panels. Scraped via the API-server proxy,
@@ -178,8 +180,10 @@ config:
   exporters:
     prometheusremotewrite:
       endpoint: http://vmsingle-server.monitoring.svc:8428/api/v1/write
+      # Keep resource attributes off the wire so k8s_*, service_*, net_*, server_*,
+      # url_scheme, and http_scheme do not become metric labels.
       resource_to_telemetry_conversion:
-        enabled: true
+        enabled: false
 
   extensions:
     health_check: {}
