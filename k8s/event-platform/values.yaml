@@ -2,7 +2,7 @@ image:
   registry: ""
   gateway: event-gateway
   worker: event-worker
-  tag: v3
+  tag: v4
   pullPolicy: Never
 
 kafka:
